@@ -1,0 +1,22 @@
+{
+  "packageId": "com.enforcado3d.game",
+  "host": "github.com",
+  "name": "Enforcado 3D",
+  "shortName": "Enforcado",
+  "themeColor": "#0a0612",
+  "backgroundColor": "#0a0612",
+  "iconUrl": "https://raw.githubusercontent.com/daveptalex/enforcado/main/icons/icon-512x512.png",
+  "maskableIconUrl": "https://raw.githubusercontent.com/daveptalex/enforcado/main/icons/icon-192x192.png",
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "signingKey": {
+    "path": "./keystore-release.jks",
+    "alias": "enforcado3d",
+    "password": "CHANGE_THIS_PASSWORD"
+  },
+  "splashScreenFadeOutDuration": 300,
+  "isChromeOSEnabled": false,
+  "isPlayBillingEnabled": false,
+  "isJavascriptDisabled": false,
+  "hasMainActivity": true
+}

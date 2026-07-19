@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Jogo do Enforcado 3D</title>
+  
+  <!-- Fontes Premium -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a0612">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Enforcado 3D">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+  <!-- Three.js e OrbitControls via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0a0612, #180d2b, #0a0612);
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #00f3ff;
+      --primary-glow: rgba(0, 243, 255, 0.4);
+      --success: #39ff14;
+      --error: #ff0055;
+      --text: #ffffff;
+      --text-muted: #8b88a5;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body, html {
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg-gradient);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Fundo dinâmico com orbes brilhantes */
+    .glow-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.15;
+    }
+    .orb-1 {
+      top: -10%;
+      left: -10%;
+      width: 60vw;
+      height: 60vw;
+      background: var(--primary);
+    }
+    .orb-2 {
+      bottom: -10%;
+      right: -10%;
+      width: 70vw;
+      height: 70vw;
+      background: #7a00ff;
+    }
+
+    /* Estrutura Principal */
+    header {
+      flex: 0 0 auto;
+      height: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(10, 6, 18, 0.5);
+      backdrop-filter: blur(10px);
+      z-index: 10;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #ffffff, var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+      text-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    /* Barra de Controlos */
+    .control-bar {
+      flex: 0 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.01);
+      border-bottom: 1px solid var(--card-border);
+      z-index: 10;
+      gap: 12px;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .control-item label {
+      font-weight: 500;
+    }
+
+    .attempts-select-container {
+      position: relative;
+    }
+
+    select {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    select:focus {
+      border-color: var(--primary);
+    }
+
+    .status-display {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .status-display strong {
+      color: var(--primary);
+      text-shadow: 0 0 8px var(--primary-glow);
+    }
+
+    #reset-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #reset-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    #reset-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Área de Jogo 3D */
+    .game-viewport {
+      flex: 1 1 auto;
+      position: relative;
+      width: 100%;
+      min-height: 200px;
+    }
+
+    #game-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .canvas-tooltip {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(5px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      animation: pulse-tooltip 2s infinite alternate;
+      transition: opacity 0.5s;
+    }
+
+    @keyframes pulse-tooltip {
+      from { opacity: 0.5; }
+      to { opacity: 0.9; }
+    }
+
+    /* Área da Palavra Secreta */
+    .word-section {
+      flex: 0 0 auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px 8px;
+      min-height: 55px;
+      background: rgba(10, 6, 18, 0.3);
+      border-top: 1px solid var(--card-border);
+      z-index: 10;
+    }
+
+    #word-display {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .word-char {
+      display: inline-block;
+      min-width: 22px;
+      height: 32px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-align: center;
+      line-height: 32px;
+      border-bottom: 3px solid rgba(255, 255, 255, 0.25);
+      color: var(--text);
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+
+    .word-char.revealed {
+      border-bottom-color: var(--primary);
+      color: var(--primary);
+      text-shadow: 0 0 12px var(--primary-glow);
+      transform: translateY(-2px);
+    }
+
+    .word-char.special-char {
+      border-bottom: none;
+      color: var(--text-muted);
+      min-width: 12px;
+    }
+
+    /* Teclado Virtual */
+    .keyboard-section {
+      flex: 0 0 auto;
+      padding: 12px 6px 20px 6px;
+      background: rgba(0, 0, 0, 0.25);
+      border-top: 1px solid var(--card-border);
+      backdrop-filter: blur(10px);
+      z-index: 10;
+    }
+
+    #keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .keyboard-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .key-btn {
+      flex: 1;
+      max-width: 45px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 12px 0;
+      cursor: pointer;
+      transition: all 0.1s ease;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .key-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .key-btn.correct {
+      background: linear-gradient(135deg, #00b4db, #0083b0);
+      border-color: #00b4db;
+      box-shadow: 0 3px 0 #005a7a, 0 0 10px rgba(0, 180, 219, 0.5);
+      pointer-events: none;
+    }
+
+    .key-btn.correct:active {
+      transform: none;
+      box-shadow: 0 3px 0 #005a7a, 0 0 10px rgba(0, 180, 219, 0.5);
+    }
+
+    .key-btn.wrong {
+      background: rgba(255, 0, 85, 0.12);
+      border-color: rgba(255, 0, 85, 0.3);
+      color: rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+      pointer-events: none;
+      transform: scale(0.95);
+    }
+
+    /* Modal / Overlay de Fim de Jogo */
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 6, 22, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .overlay-content {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 30px 24px;
+      text-align: center;
+      max-width: 320px;
+      width: 100%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      transform: scale(0.9);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .overlay.visible .overlay-content {
+      transform: scale(1);
+    }
+
+    #overlay-title {
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .victory-title {
+      color: var(--success);
+      text-shadow: 0 0 15px rgba(57, 255, 20, 0.4);
+      animation: pulse-title 1.5s infinite alternate;
+    }
+
+    .defeat-title {
+      color: var(--error);
+      text-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+      animation: shake-title 0.5s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-title {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
+
+    @keyframes shake-title {
+      from { transform: rotate(-1deg); }
+      to { transform: rotate(1deg); }
+    }
+
+    #overlay-message {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    #overlay-message strong {
+      color: var(--text);
+      display: block;
+      font-size: 1.3rem;
+      margin-top: 8px;
+      letter-spacing: 1px;
+    }
+
+    #overlay-btn {
+      background: linear-gradient(90deg, #00f3ff, #0083b0);
+      border: none;
+      color: #000000;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 12px 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 4px 15px rgba(0, 243, 255, 0.4);
+      transition: all 0.2s;
+    }
+
+    #overlay-btn:hover {
+      box-shadow: 0 6px 20px rgba(0, 243, 255, 0.6);
+      transform: translateY(-2px);
+    }
+
+    #overlay-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* Adaptabilidade de Ecrã */
+    @media (max-height: 600px) {
+      .key-btn {
+        padding: 8px 0;
+        font-size: 0.95rem;
+      }
+      .word-char {
+        font-size: 1.2rem;
+        height: 26px;
+        line-height: 26px;
+        min-width: 18px;
+      }
+      h1 {
+        font-size: 1.1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="glow-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+  </div>
+
+  <header>
+    <h1>Enforcado 3D</h1>
+  </header>
+
+  <div class="control-bar">
+    <div class="control-item">
+      <label for="attempts-select">Erros Máx:</label>
+      <select id="attempts-select" onchange="changeMaxAttempts(this.value)">
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="11">11</option>
+        <option value="12" selected>12</option>
+      </select>
+    </div>
+    
+    <div class="control-item status-display">
+      <span>Falhas: <strong id="mistakes-count">0</strong>/<strong id="max-mistakes-display">12</strong></span>
+    </div>
+
+    <button id="reset-btn" onclick="resetGame()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      Reiniciar
+    </button>
+  </div>
+
+  <div class="game-viewport" id="viewport">
+    <canvas id="game-canvas"></canvas>
+    <div class="canvas-tooltip" id="tooltip">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      Desliza para rodar em 3D
+    </div>
+  </div>
+
+  <div class="word-section">
+    <div id="word-display"></div>
+  </div>
+
+  <div class="keyboard-section">
+    <div id="keyboard"></div>
+  </div>
+
+  <!-- Overlay Fim de Jogo -->
+  <div id="game-overlay" class="overlay">
+    <div class="overlay-content">
+      <h2 id="overlay-title">VITÓRIA!</h2>
+      <p id="overlay-message">Parabéns! Descobriste a palavra.</p>
+      <p class="word-reveal-box" style="margin: 15px 0; font-size: 1.1rem; color: var(--text-muted);">
+        A palavra era: <strong id="overlay-word" style="color: var(--text); font-size: 1.4rem; letter-spacing: 1px; display: block; margin-top: 5px;">...</strong>
+      </p>
+      <button id="overlay-btn" onclick="resetGame()">Jogar Novamente</button>
+    </div>
+  </div>
+
+  <script>
+    // --- LÓGICA DO JOGO ---
+    let wordsList = [];
+    let currentWord = "";
+    let normalizedWord = "";
+    let guessedLetters = new Set();
+    let mistakes = 0;
+    let maxMistakes = 12;
+    let gameOver = false;
+
+    // Remover acentos e cedilhas
+    function normalizeWord(word) {
+      return word
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/ç/g, "c")
+        .replace(/Ç/g, "C")
+        .toUpperCase();
+    }
+
+    // Carregar palavras.txt
+    async function loadWords() {
+      try {
+        const response = await fetch('palavras.txt');
+        if (!response.ok) throw new Error('Não foi possível carregar palavras.txt');
+        const text = await response.text();
+        wordsList = text.split(/\r?\n/)
+                        .map(w => w.trim())
+                        .filter(w => w.length > 0);
+      } catch (err) {
+        console.warn("Ficheiro palavras.txt em falta ou com erros. Usando palavras de salvaguarda.", err);
+        wordsList = [
+          "PROGRAMAÇÃO", "TELEMÓVEL", "BACALHAU", "CARAVELA", "PORTUGAL", 
+          "LISBOA", "PORTO", "AZEITE", "SARDINHA", "CASTELO", "FADO"
+        ];
+      }
+      
+      if (wordsList.length === 0) {
+        wordsList = ["JOGO", "ENFORCADO", "BONECO", "TERMO"];
+      }
+      
+      initGame();
+    }
+
+    function initGame() {
+      // Escolher palavra aleatória
+      const randomIndex = Math.floor(Math.random() * wordsList.length);
+      currentWord = wordsList[randomIndex].toUpperCase();
+      normalizedWord = normalizeWord(currentWord);
+      
+      guessedLetters.clear();
+      mistakes = 0;
+      gameOver = false;
+
+      // Resetar UI
+      updateMistakesDisplay();
+      renderWordDisplay();
+      renderKeyboard();
+      
+      document.getElementById('game-overlay').classList.remove('visible');
+
+      // Resetar boneco 3D e câmara
+      reset3DScene();
+    }
+
+    function renderWordDisplay() {
+      const container = document.getElementById('word-display');
+      container.innerHTML = '';
+      
+      // Ajustar o tamanho da letra se a palavra for muito grande para caber no smartphone
+      let fontSize = '1.5rem';
+      if (currentWord.length > 12) fontSize = '1.1rem';
+      else if (currentWord.length > 9) fontSize = '1.3rem';
+
+      for (let i = 0; i < currentWord.length; i++) {
+        const char = currentWord[i];
+        const normChar = normalizedWord[i];
+        
+        const span = document.createElement('span');
+        span.className = 'word-char';
+        span.style.fontSize = fontSize;
+        
+        if (normChar === '-' || normChar === ' ' || normChar === '_') {
+          span.textContent = char;
+          span.classList.add('special-char');
+        } else if (guessedLetters.has(normChar)) {
+          span.textContent = char;
+          span.classList.add('revealed');
+        } else {
+          span.textContent = '_';
+        }
+        container.appendChild(span);
+      }
+    }
+
+    const keyboardRows = [
+      ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+      ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+      ["Z", "X", "C", "V", "B", "N", "M"]
+    ];
+
+    function renderKeyboard() {
+      const container = document.getElementById('keyboard');
+      container.innerHTML = '';
+      
+      keyboardRows.forEach(row => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'keyboard-row';
+        
+        row.forEach(letter => {
+          const btn = document.createElement('button');
+          btn.className = 'key-btn';
+          btn.id = `key-${letter}`;
+          btn.textContent = letter;
+          btn.onclick = () => handleGuess(letter);
+          rowDiv.appendChild(btn);
+        });
+        
+        container.appendChild(rowDiv);
+      });
+    }
+
+    function handleGuess(letter) {
+      if (gameOver || guessedLetters.has(letter)) return;
+      
+      guessedLetters.add(letter);
+      const btn = document.getElementById(`key-${letter}`);
+      
+      if (normalizedWord.includes(letter)) {
+        if (btn) btn.classList.add('correct');
+        renderWordDisplay();
+        
+        // Verificar vitória
+        const won = [...normalizedWord].every(char => {
+          if (char >= 'A' && char <= 'Z') return guessedLetters.has(char);
+          return true;
+        });
+        
+        if (won) {
+          triggerEndGame(true);
+        }
+      } else {
+        if (btn) btn.classList.add('wrong');
+        mistakes++;
+        updateMistakesDisplay();
+        
+        // Atualizar boneco 3D
+        updateStickmanVisibility();
+        
+        if (mistakes >= maxMistakes) {
+          triggerEndGame(false);
+        }
+      }
+    }
+
+    function updateMistakesDisplay() {
+      document.getElementById('mistakes-count').textContent = mistakes;
+      document.getElementById('max-mistakes-display').textContent = maxMistakes;
+    }
+
+    function changeMaxAttempts(value) {
+      maxMistakes = parseInt(value);
+      resetGame();
+    }
+
+    function resetGame() {
+      initGame();
+    }
+
+    function triggerEndGame(won) {
+      gameOver = true;
+      const overlay = document.getElementById('game-overlay');
+      const title = document.getElementById('overlay-title');
+      const message = document.getElementById('overlay-message');
+      const wordDisplay = document.getElementById('overlay-word');
+      
+      wordDisplay.textContent = currentWord;
+      
+      if (won) {
+        title.textContent = "VITÓRIA!";
+        title.className = "victory-title";
+        message.innerHTML = `Parabéns! Descobriste a palavra com <strong>${mistakes}</strong> falhas.`;
+        
+        // Efeitos 3D de vitória
+        triggerVictoryState();
+      } else {
+        title.textContent = "ENFORCADO!";
+        title.className = "defeat-title";
+        message.innerHTML = `Que pena! Não conseguiste adivinhar a palavra.`;
+        
+        // Efeitos 3D de derrota (zoom na face)
+        triggerDefeatState();
+      }
+      
+      setTimeout(() => {
+        overlay.classList.add('visible');
+      }, 800);
+    }
+
+    // Ouvir teclado físico
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toUpperCase();
+      if (key >= 'A' && key <= 'Z' && key.length === 1) {
+        handleGuess(key);
+      }
+    });
+
+    // Ocultar dica após interagir no ecrã
+    const viewport = document.getElementById('viewport');
+    const tooltip = document.getElementById('tooltip');
+    viewport.addEventListener('pointerdown', () => {
+      tooltip.style.opacity = '0';
+    }, { once: true });
+
+
+    // --- RENDERING 3D (THREE.JS) ---
+    const canvas = document.getElementById('game-canvas');
+    const scene = new THREE.Scene();
+    
+    // Câmara
+    const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 0.1, 100);
+    const initialCamPos = new THREE.Vector3(2.6, 1.2, 5.2);
+    camera.position.copy(initialCamPos);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // Controlos Orbitais
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 2.5;
+    controls.maxDistance = 8;
+    controls.maxPolarAngle = Math.PI / 2 + 0.05; // impede de ver por baixo do chão
+    controls.enablePan = false;
+    
+    const initialTarget = new THREE.Vector3(0.3, 0.1, 0);
+    controls.target.copy(initialTarget);
+
+    // Iluminação
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.3);
+    dirLight.position.set(4, 8, 5);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.bias = -0.0005;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 15;
+    dirLight.shadow.camera.left = -3;
+    dirLight.shadow.camera.right = 3;
+    dirLight.shadow.camera.top = 3;
+    dirLight.shadow.camera.bottom = -3;
+    scene.add(dirLight);
+
+    // Luz de palco neon brilhante
+    const pointLight = new THREE.PointLight(0x00f3ff, 1.5, 8);
+    pointLight.position.set(0.6, 2.2, 0.8);
+    scene.add(pointLight);
+
+    // Chão metálico escuro
+    const floorGeom = new THREE.PlaneGeometry(12, 12);
+    const floorMat = new THREE.MeshStandardMaterial({ 
+      color: 0x090710, 
+      roughness: 0.8, 
+      metalness: 0.3 
+    });
+    const floor = new THREE.Mesh(floorGeom, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -2.1;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // MATERIAIS
+    // Material de madeira com aspeto 3D rico e rugosidade
+    const woodMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x482b1d, 
+      roughness: 0.9, 
+      metalness: 0.05 
+    });
+    
+    // Material de corda
+    const ropeMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xc8ad7f, 
+      roughness: 0.95 
+    });
+
+    // Material do Boneco Holográfico brilhante
+    const bonecoMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00f3ff,
+      emissive: 0x002c38,
+      roughness: 0.15,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.95
+    });
+
+    // --- CONSTRUÇÃO DA FORCA ---
+    const gallows = new THREE.Group();
+
+    // Base inferior
+    const base1Geom = new THREE.BoxGeometry(3.6, 0.15, 3.6);
+    const base1 = new THREE.Mesh(base1Geom, woodMaterial);
+    base1.position.set(0, -2.025, 0);
+    base1.receiveShadow = true;
+    base1.castShadow = true;
+    gallows.add(base1);
+
+    // Base superior
+    const base2Geom = new THREE.BoxGeometry(2.8, 0.15, 2.8);
+    const base2 = new THREE.Mesh(base2Geom, woodMaterial);
+    base2.position.set(0, -1.875, 0);
+    base2.receiveShadow = true;
+    base2.castShadow = true;
+    gallows.add(base2);
+
+    // Poste vertical
+    const poleGeom = new THREE.BoxGeometry(0.3, 4.0, 0.3);
+    const pole = new THREE.Mesh(poleGeom, woodMaterial);
+    pole.position.set(-1.0, 0.1, 0);
+    pole.castShadow = true;
+    pole.receiveShadow = true;
+    gallows.add(pole);
+
+    // Trave horizontal superior
+    const beamGeom = new THREE.BoxGeometry(2.3, 0.3, 0.3);
+    const beam = new THREE.Mesh(beamGeom, woodMaterial);
+    beam.position.set(0.0, 2.25, 0);
+    beam.castShadow = true;
+    beam.receiveShadow = true;
+    gallows.add(beam);
+
+    // Suporte diagonal
+    const supportGeom = new THREE.BoxGeometry(0.2, 1.4, 0.2);
+    supportGeom.translate(0, -0.7, 0);
+    const support = new THREE.Mesh(supportGeom, woodMaterial);
+    support.position.set(-0.9, 2.1, 0);
+    support.rotation.z = Math.PI / 4;
+    support.castShadow = true;
+    support.receiveShadow = true;
+    gallows.add(support);
+
+    // A Corda
+    const ropeGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.8, 12);
+    const rope = new THREE.Mesh(ropeGeom, ropeMaterial);
+    rope.position.set(0.8, 1.8, 0);
+    rope.castShadow = true;
+    gallows.add(rope);
+
+    scene.add(gallows);
+
+
+    // --- CONSTRUÇÃO DO BONECO ---
+    const stickman = new THREE.Group();
+    stickman.position.set(0.8, 1.4, 0); // Ponto de ancoragem abaixo da corda
+    scene.add(stickman);
+
+    const stickmanParts = [];
+
+    // Auxiliar para criar partes do boneco e manter pivôs consistentes
+    function createPart(geometry, material, pos, rotZ = 0, parent = stickman) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(pos);
+      mesh.rotation.z = rotZ;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.scale.set(0.001, 0.001, 0.001); // Começam invisíveis
+      parent.add(mesh);
+      stickmanParts.push(mesh);
+      return mesh;
+    }
+
+    // 1. Cabeça (Esfera)
+    const headGeom = new THREE.SphereGeometry(0.24, 32, 32);
+    const head = createPart(headGeom, bonecoMaterial, new THREE.Vector3(0, -0.24, 0));
+
+    // 2. Pescoço (Cilindro)
+    const neckGeom = new THREE.CylinderGeometry(0.05, 0.05, 0.15, 16);
+    createPart(neckGeom, bonecoMaterial, new THREE.Vector3(0, -0.525, 0));
+
+    // 3. Tronco (Cilindro)
+    const torsoGeom = new THREE.CylinderGeometry(0.09, 0.09, 0.9, 16);
+    createPart(torsoGeom, bonecoMaterial, new THREE.Vector3(0, -1.05, 0));
+
+    // 4. Braço Esquerdo Superior (Pivô no ombro)
+    const armGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.38, 16);
+    armGeom.translate(0, -0.19, 0); // Deslocar para articular no topo
+    const armLUp = createPart(armGeom, bonecoMaterial, new THREE.Vector3(-0.09, -0.65, 0), -Math.PI / 4);
+
+    // 5. Antebraço Esquerdo + Mão (Articulado no cotovelo)
+    const foreArmGeom = new THREE.CylinderGeometry(0.035, 0.035, 0.35, 16);
+    foreArmGeom.translate(0, -0.175, 0);
+    const armLDown = createPart(foreArmGeom, bonecoMaterial, new THREE.Vector3(0, -0.38, 0), -Math.PI / 12, armLUp);
+    
+    const handGeom = new THREE.SphereGeometry(0.045, 16, 16);
+    const handL = new THREE.Mesh(handGeom, bonecoMaterial);
+    handL.position.set(0, -0.35, 0);
+    handL.castShadow = true;
+    handL.receiveShadow = true;
+    armLDown.add(handL);
+
+    // 6. Braço Direito Superior
+    const armRUp = createPart(armGeom, bonecoMaterial, new THREE.Vector3(0.09, -0.65, 0), Math.PI / 4);
+
+    // 7. Antebraço Direito + Mão
+    const foreArmRGeom = new THREE.CylinderGeometry(0.035, 0.035, 0.35, 16);
+    foreArmRGeom.translate(0, -0.175, 0);
+    const armRDown = createPart(foreArmRGeom, bonecoMaterial, new THREE.Vector3(0, -0.38, 0), Math.PI / 12, armRUp);
+    
+    const handR = new THREE.Mesh(handGeom, bonecoMaterial);
+    handR.position.set(0, -0.35, 0);
+    handR.castShadow = true;
+    handR.receiveShadow = true;
+    armRDown.add(handR);
+
+    // 8. Perna Esquerda Superior (Pivô na anca)
+    const legGeom = new THREE.CylinderGeometry(0.05, 0.05, 0.48, 16);
+    legGeom.translate(0, -0.24, 0);
+    const legLUp = createPart(legGeom, bonecoMaterial, new THREE.Vector3(-0.07, -1.5, 0), -Math.PI / 16);
+
+    // 9. Perna Esquerda Inferior + Pé
+    const calfGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.45, 16);
+    calfGeom.translate(0, -0.225, 0);
+    const legLDown = createPart(calfGeom, bonecoMaterial, new THREE.Vector3(0, -0.48, 0), Math.PI / 48, legLUp);
+    
+    const footGeom = new THREE.BoxGeometry(0.08, 0.05, 0.16);
+    const footL = new THREE.Mesh(footGeom, bonecoMaterial);
+    footL.position.set(0, -0.45, 0.04);
+    footL.castShadow = true;
+    footL.receiveShadow = true;
+    legLDown.add(footL);
+
+    // 10. Perna Direita Superior
+    const legRUp = createPart(legGeom, bonecoMaterial, new THREE.Vector3(0.07, -1.5, 0), Math.PI / 16);
+
+    // 11. Perna Direita Inferior + Pé
+    const calfRGeom = new THREE.CylinderGeometry(0.04, 0.04, 0.45, 16);
+    calfRGeom.translate(0, -0.225, 0);
+    const legRDown = createPart(calfRGeom, bonecoMaterial, new THREE.Vector3(0, -0.48, 0), -Math.PI / 48, legRUp);
+    
+    const footR = new THREE.Mesh(footGeom, bonecoMaterial);
+    footR.position.set(0, -0.45, 0.04);
+    footR.castShadow = true;
+    footR.receiveShadow = true;
+    legRDown.add(footR);
+
+    // 12. Face Triste / Olhos de "X" (Representada como um sub-grupo)
+    const faceDetails = new THREE.Group();
+    faceDetails.position.set(0, 0, 0.25); // Colocado à frente da cabeça
+    faceDetails.scale.set(0.001, 0.001, 0.001); // Escondido de início
+    head.add(faceDetails);
+    stickmanParts.push(faceDetails); // Adicionado como o último elemento (index 11)
+
+    // Olho Esquerdo (X)
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+    const eyeBarGeom = new THREE.BoxGeometry(0.015, 0.07, 0.015);
+    
+    const eyeL1 = new THREE.Mesh(eyeBarGeom, eyeMat);
+    eyeL1.position.set(-0.06, 0.04, 0.01);
+    eyeL1.rotation.z = Math.PI / 4;
+    eyeL1.rotation.y = Math.PI / 10;
+    const eyeL2 = eyeL1.clone();
+    eyeL2.rotation.z = -Math.PI / 4;
+    faceDetails.add(eyeL1);
+    faceDetails.add(eyeL2);
+
+    // Olho Direito (X)
+    const eyeR1 = new THREE.Mesh(eyeBarGeom, eyeMat);
+    eyeR1.position.set(0.06, 0.04, 0.01);
+    eyeR1.rotation.z = Math.PI / 4;
+    eyeR1.rotation.y = -Math.PI / 10;
+    const eyeR2 = eyeR1.clone();
+    eyeR2.rotation.z = -Math.PI / 4;
+    faceDetails.add(eyeR1);
+    faceDetails.add(eyeR2);
+
+    // Boca Triste (Arco / Retângulo curvado)
+    const mouthGeom = new THREE.BoxGeometry(0.08, 0.015, 0.015);
+    const mouth = new THREE.Mesh(mouthGeom, eyeMat);
+    mouth.position.set(0, -0.07, 0.01);
+    mouth.rotation.x = Math.PI / 8;
+    faceDetails.add(mouth);
+
+
+    // --- ANIMAÇÕES E INTERPOLAÇÕES CAMERA ---
+    let cameraTarget = new THREE.Vector3().copy(initialTarget);
+    let cameraTargetPos = new THREE.Vector3().copy(initialCamPos);
+    let isTransitioningCamera = false;
+    let victoryParticles = null;
+    let autoRotateMode = true;
+
+    // Atualiza a visibilidade das partes do boneco
+    function updateStickmanVisibility() {
+      // Determina quantas partes devem estar visíveis
+      // Se mistakes = maxMistakes, todas as 12 partes aparecem
+      const partsToReveal = Math.floor((mistakes / maxMistakes) * stickmanParts.length);
+      
+      stickmanParts.forEach((part, index) => {
+        part.userData.targetScale = (index < partsToReveal) ? 1.0 : 0.001;
+      });
+    }
+
+    function reset3DScene() {
+      // Limpar partículas antigas
+      if (victoryParticles) {
+        scene.remove(victoryParticles);
+        victoryParticles.geometry.dispose();
+        victoryParticles.material.dispose();
+        victoryParticles = null;
+      }
+
+      // Resetar escalas dos membros
+      stickmanParts.forEach(part => {
+        part.userData.targetScale = 0.001;
+        part.scale.set(0.001, 0.001, 0.001);
+      });
+
+      // Restaurar câmara e controlos
+      cameraTargetPos.copy(initialCamPos);
+      cameraTarget.copy(initialTarget);
+      isTransitioningCamera = true;
+      controls.enabled = false;
+    }
+
+    function triggerDefeatState() {
+      // Zoom focado na cabeça do enforcado
+      isTransitioningCamera = true;
+      controls.enabled = false;
+      autoRotateMode = false;
+      
+      // Focar câmara na cabeça (posição absoluta da cabeça é ~ 0.8, 1.16, 0)
+      cameraTarget.set(0.8, 1.16, 0);
+      cameraTargetPos.set(0.8, 1.16, 1.0); // Fica mesmo à frente
+    }
+
+    function triggerVictoryState() {
+      isTransitioningCamera = true;
+      controls.enabled = false;
+      autoRotateMode = false;
+      
+      // Zoom out para ver o boneco completo e comemoração
+      cameraTarget.set(0.8, 0.4, 0);
+      cameraTargetPos.set(2.8, 0.7, 4.8);
+      
+      spawnVictoryParticles();
+    }
+
+    // Partículas de Vitória
+    function spawnVictoryParticles() {
+      const particleCount = 180;
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+      const velocities = [];
+      const colors = [];
+
+      for (let i = 0; i < particleCount; i++) {
+        // Posição de origem (perto do peito do boneco: 0.8, 0.35, 0)
+        positions.push(0.8, 0.35, 0);
+        
+        // Direção e velocidade aleatórias
+        const angle = Math.random() * Math.PI * 2;
+        const elevation = (Math.random() * 0.7) + 0.3; // propensas a subir
+        const speed = 0.03 + Math.random() * 0.07;
+        
+        velocities.push(
+          Math.cos(angle) * speed,
+          elevation * (0.04 + Math.random() * 0.06),
+          Math.sin(angle) * speed
+        );
+
+        // Cores vibrantes do festival
+        const color = new THREE.Color();
+        color.setHSL(Math.random(), 1.0, 0.55);
+        colors.push(color.r, color.g, color.b);
+      }
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: 0.09,
+        vertexColors: true,
+        transparent: true,
+        opacity: 1.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      victoryParticles = new THREE.Points(geometry, material);
+      victoryParticles.userData = { velocities, opacity: 1.0 };
+      scene.add(victoryParticles);
+    }
+
+    // --- LOOP DE ANIMAÇÃO ---
+    const clock = new THREE.Clock();
+    let currentLookAt = new THREE.Vector3().copy(initialTarget);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Suavizar escalas das partes do boneco (aparecimento animado)
+      stickmanParts.forEach(part => {
+        const target = part.userData.targetScale || 0.001;
+        part.scale.x += (target - part.scale.x) * 0.08;
+        part.scale.y += (target - part.scale.y) * 0.08;
+        part.scale.z += (target - part.scale.z) * 0.08;
+      });
+
+      // Flutuação suave pendurada para o boneco se estiver visível
+      if (mistakes > 0) {
+        const time = clock.getElapsedTime();
+        // Baloicar e movimentar mais
+        stickman.rotation.z = Math.sin(time * 1.8) * 0.08;
+        stickman.rotation.x = Math.cos(time * 1.4) * 0.06;
+        stickman.rotation.y = Math.sin(time * 1.0) * 0.04;
+      } else {
+        stickman.rotation.set(0, 0, 0);
+      }
+
+      // Interpolar transição de câmara no final do jogo ou no reset
+      if (isTransitioningCamera) {
+        camera.position.lerp(cameraTargetPos, 0.06);
+        currentLookAt.lerp(cameraTarget, 0.06);
+        camera.lookAt(currentLookAt);
+
+        // Se o jogo recomeçou e a câmara chegou perto do destino inicial, devolve o controlo ao utilizador
+        if (!gameOver) {
+          const dist = camera.position.distanceTo(cameraTargetPos);
+          if (dist < 0.05) {
+            isTransitioningCamera = false;
+            controls.target.copy(cameraTarget);
+            controls.enabled = true;
+            autoRotateMode = true;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.4;
+          }
+        }
+      } else {
+        // Fora das transições, usar os controlos normais
+        controls.update();
+      }
+
+      // Animámos as partículas se existirem
+      if (victoryParticles) {
+        const posAttr = victoryParticles.geometry.attributes.position;
+        const vels = victoryParticles.userData.velocities;
+        
+        for (let i = 0; i < posAttr.count; i++) {
+          let x = posAttr.getX(i) + vels[i * 3];
+          let y = posAttr.getY(i) + vels[i * 3 + 1];
+          let z = posAttr.getZ(i) + vels[i * 3 + 2];
+          
+          // Gravidade
+          vels[i * 3 + 1] -= 0.0015;
+          
+          posAttr.setXYZ(i, x, y, z);
+        }
+        posAttr.needsUpdate = true;
+        
+        // Desvanecer
+        victoryParticles.userData.opacity -= 0.004;
+        victoryParticles.material.opacity = victoryParticles.userData.opacity;
+        
+        if (victoryParticles.userData.opacity <= 0) {
+          scene.remove(victoryParticles);
+          victoryParticles.geometry.dispose();
+          victoryParticles.material.dispose();
+          victoryParticles = null;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // Redimensionar canvas
+    function handleResize() {
+      const width = viewport.clientWidth;
+      const height = viewport.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+    
+    window.addEventListener('resize', handleResize);
+
+    // Iniciar tudo ao carregar a página
+    window.onload = () => {
+      // Ajustar canvas inicial
+      handleResize();
+      
+      // Carregar palavras e iniciar
+      loadWords();
+      
+      // Iniciar ciclo de renderização
+      animate();
+    };
+
+    // Parar rotação automática se o utilizador interagir manualmente
+    controls.addEventListener('start', () => {
+      autoRotateMode = false;
+      controls.autoRotate = false;
+    });
+
+    // Registar Service Worker para PWA/TWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('Service Worker registado:', reg.scope))
+        .catch(err => console.warn('Falha ao registar Service Worker:', err));
+    }
+  </script>
+</body>
+</html>
